@@ -333,6 +333,13 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
           </div>
           <p id="spotlightGenre" class="text-xs text-cyan-400 font-medium"></p>
           <p id="spotlightSummary" class="text-xs sm:text-sm text-gray-400 line-clamp-2 mt-1"></p>
+          <!-- Official Watch Providers / OTT buttons -->
+          <div id="spotlightProvidersContainer" class="hidden mt-2 pt-2 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-gray-400 mb-1.5 flex items-center gap-1">
+              <span>🍿</span> Official OTT Streaming Platforms:
+            </div>
+            <div id="spotlightProviders" class="flex items-center gap-2 flex-wrap"></div>
+          </div>
         </div>
       </div>
 
@@ -425,6 +432,15 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       <div id="spinner" class="hidden text-center py-10 text-gray-400 text-sm">
         <div class="inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-2"></div>
         <p>Searching open web, verifying movie identity, and checking prints...</p>
+      </div>
+
+      <!-- Disambiguation Candidates Bar -->
+      <div id="disambiguationBar" class="hidden glass-panel p-3.5 rounded-2xl border border-indigo-500/30 flex flex-col gap-2 my-2">
+        <div class="text-xs font-bold text-indigo-300 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span>🎯</span> Select exact movie title:</span>
+          <span class="text-[10px] text-gray-400 font-normal">Powered by Cinemeta Canonical Registry</span>
+        </div>
+        <div id="disambiguationList" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin"></div>
       </div>
 
       <!-- Results List -->
@@ -736,6 +752,16 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         };
       } catch (e) {}
     })();
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     let activePrintFilter = 'all';
     let currentResults = [];
@@ -1065,16 +1091,18 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       renderResults(currentResults);
     }
 
-    async function searchMovie() {
+    async function searchMovie(targetImdbId) {
       const query = document.getElementById('movieInput').value.trim();
       const language = document.getElementById('langInput').value;
       const resultsList = document.getElementById('resultsList');
       const spotlightCard = document.getElementById('spotlightCard');
+      const disambiguationBar = document.getElementById('disambiguationBar');
       const spinner = document.getElementById('spinner');
 
       if (!query) {
         resultsList.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">Please type a movie name to search.</p>';
         spotlightCard.classList.add('hidden');
+        if (disambiguationBar) disambiguationBar.classList.add('hidden');
         currentResults = [];
         return;
       }
@@ -1082,13 +1110,16 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       spinner.classList.remove('hidden');
       resultsList.innerHTML = '';
       spotlightCard.classList.add('hidden');
+      if (disambiguationBar) disambiguationBar.classList.add('hidden');
       currentResults = [];
 
       try {
+        const payload = { query, language };
+        if (targetImdbId) payload.imdb_id = targetImdbId;
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ query, language })
+          body: JSON.stringify(payload)
         });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -1102,13 +1133,49 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
         if (data.meta && data.meta.has_meta && data.meta.poster) {
           document.getElementById('spotlightPoster').src = data.meta.poster;
-          document.getElementById('spotlightTitle').innerText = data.query || query;
-          document.getElementById('spotlightYear').innerText = data.meta.year || "Movie";
-          document.getElementById('spotlightRating').innerText = `★ ${data.meta.rating}`;
-          document.getElementById('spotlightGenre').innerText = data.meta.genres;
-          document.getElementById('spotlightSummary').innerText = data.meta.summary;
+          document.getElementById('spotlightTitle').textContent = data.meta.title || data.query || query;
+          document.getElementById('spotlightYear').textContent = data.meta.year || "Movie";
+          document.getElementById('spotlightRating').textContent = `★ ${data.meta.rating}`;
+          document.getElementById('spotlightGenre').textContent = data.meta.genres || '';
+          document.getElementById('spotlightSummary').textContent = data.meta.summary || '';
           spotlightCard.classList.remove('hidden');
           activeCast = data.meta.cast || [];
+        }
+
+        // Render Official OTT Watch Providers
+        const provCont = document.getElementById('spotlightProvidersContainer');
+        const provList = document.getElementById('spotlightProviders');
+        if (provCont && provList && data.official_providers && data.official_providers.length > 0) {
+          provList.innerHTML = data.official_providers.map(p => `
+            <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer" 
+              class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 hover:border-cyan-500/60 text-xs font-semibold text-gray-200 hover:text-white transition flex items-center gap-1.5 shadow">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+              <span>${escapeHtml(p.name)}</span>
+              <span class="text-[10px] text-gray-500">↗</span>
+            </a>
+          `).join('');
+          provCont.classList.remove('hidden');
+        } else if (provCont) {
+          provCont.classList.add('hidden');
+        }
+
+        // Render Disambiguation Candidates
+        const dBar = document.getElementById('disambiguationBar');
+        const dList = document.getElementById('disambiguationList');
+        if (dBar && dList && data.disambiguation && data.disambiguation.length > 1) {
+          dList.innerHTML = data.disambiguation.map(c => `
+            <button onclick="selectDisambiguationCandidate('${escapeHtml(c.title).replace(/'/g, "\\'")}', '${escapeHtml(c.imdb_id)}')" 
+              class="px-3 py-1.5 rounded-xl bg-gray-900/90 hover:bg-indigo-600/30 border border-gray-700 hover:border-indigo-500/50 text-xs text-white shrink-0 flex items-center gap-2 transition active:scale-95">
+              ${c.poster ? `<img src="${escapeHtml(c.poster)}" class="w-5 h-7 object-cover rounded shadow" onerror="this.style.display='none'">` : ''}
+              <div class="text-left">
+                <div class="font-bold leading-tight">${escapeHtml(c.title)}</div>
+                <div class="text-[10px] text-gray-400">${escapeHtml(c.year || '')}</div>
+              </div>
+            </button>
+          `).join('');
+          dBar.classList.remove('hidden');
+        } else if (dBar) {
+          dBar.classList.add('hidden');
         }
 
         // Render Related AI Suggestions
@@ -1116,10 +1183,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         const aiCards = document.getElementById('aiSuggestionsCards');
         if (data.ai_suggestions && data.ai_suggestions.length > 0) {
           aiCards.innerHTML = data.ai_suggestions.map(s => `
-            <div onclick="applySuggestion('${s.title}', '${s.lang || 'Telugu'}')" class="glass-panel p-2 rounded-xl cursor-pointer hover:border-purple-500/50 hover:scale-[1.02] transition flex flex-col gap-1 group">
-              <img src="${s.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-28 sm:h-32 object-cover rounded-lg" />
-              <div class="text-xs font-bold text-white truncate">${s.title}</div>
-              <div class="text-[10px] text-purple-300 font-medium truncate">${s.badge || s.lang} • ${s.year || ''}</div>
+            <div onclick="applySuggestion('${escapeHtml(s.title).replace(/'/g, "\\'")}', '${escapeHtml(s.lang || 'Telugu')}')" class="glass-panel p-2 rounded-xl cursor-pointer hover:border-purple-500/50 hover:scale-[1.02] transition flex flex-col gap-1 group">
+              <img src="${escapeHtml(s.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300')}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-28 sm:h-32 object-cover rounded-lg" />
+              <div class="text-xs font-bold text-white truncate">${escapeHtml(s.title)}</div>
+              <div class="text-[10px] text-purple-300 font-medium truncate">${escapeHtml(s.badge || s.lang)} • ${escapeHtml(s.year || '')}</div>
               <button class="mt-1 w-full py-1 text-[11px] rounded bg-purple-600/80 group-hover:bg-purple-600 text-white font-bold transition">▶ Stream</button>
             </div>
           `).join('');
@@ -1133,13 +1200,21 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       } catch (err) {
         document.getElementById('aiSuggestionsSection').classList.add('hidden');
         spotlightCard.classList.add('hidden');
+        if (disambiguationBar) disambiguationBar.classList.add('hidden');
         currentResults = [];
-        resultsList.innerHTML = `<div class="glass-panel p-5 rounded-xl text-center border border-rose-500/30 text-rose-400 text-sm my-4">
-          ⚠️ ${err.message || "Failed to search movies. Please check your connection."}
-        </div>`;
+        const errContainer = document.createElement('div');
+        errContainer.className = "glass-panel p-5 rounded-xl text-center border border-rose-500/30 text-rose-400 text-sm my-4";
+        errContainer.textContent = "⚠️ " + (err.message || "Failed to search movies. Please check your connection.");
+        resultsList.innerHTML = '';
+        resultsList.appendChild(errContainer);
       } finally {
         spinner.classList.add('hidden');
       }
+    }
+
+    function selectDisambiguationCandidate(title, imdbId) {
+      document.getElementById('movieInput').value = title;
+      searchMovie(imdbId);
     }
 
     function applySuggestion(title, lang) {
@@ -1168,10 +1243,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         });
         const data = await res.json();
         moodCards.innerHTML = data.recommendations.map(m => `
-          <div onclick="selectMoodMovie('${m.title}')" class="glass-panel p-2.5 rounded-xl cursor-pointer hover:border-purple-500/50 transition flex flex-col gap-1.5 group">
-            <img src="${m.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-36 object-cover rounded-lg group-hover:scale-105 transition" />
-            <div class="text-xs font-bold text-white truncate">${m.title}</div>
-            <div class="text-[10px] text-amber-400">★ ${m.rating} • ${m.genres}</div>
+          <div onclick="selectMoodMovie('${escapeHtml(m.title).replace(/'/g, "\\'")}')" class="glass-panel p-2.5 rounded-xl cursor-pointer hover:border-purple-500/50 transition flex flex-col gap-1.5 group">
+            <img src="${escapeHtml(m.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300')}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-36 object-cover rounded-lg group-hover:scale-105 transition" />
+            <div class="text-xs font-bold text-white truncate">${escapeHtml(m.title)}</div>
+            <div class="text-[10px] text-amber-400">★ ${escapeHtml(m.rating)} • ${escapeHtml(m.genres)}</div>
           </div>
         `).join('');
       } catch (e) {
@@ -1189,10 +1264,12 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       const url = document.getElementById('directUrlInput').value.trim();
       const resultsList = document.getElementById('resultsList');
       const spotlightCard = document.getElementById('spotlightCard');
+      const disambiguationBar = document.getElementById('disambiguationBar');
       const spinner = document.getElementById('spinner');
 
       if (!url) {
         spotlightCard.classList.add('hidden');
+        if (disambiguationBar) disambiguationBar.classList.add('hidden');
         resultsList.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">Please enter a valid video stream URL (.m3u8, .mp4, or web stream).</p>';
         currentResults = [];
         return;
@@ -1201,6 +1278,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       spinner.classList.remove('hidden');
       resultsList.innerHTML = '';
       spotlightCard.classList.add('hidden');
+      if (disambiguationBar) disambiguationBar.classList.add('hidden');
       currentResults = [];
 
       try {
@@ -1218,10 +1296,13 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         renderResults(currentResults);
       } catch (err) {
         spotlightCard.classList.add('hidden');
+        if (disambiguationBar) disambiguationBar.classList.add('hidden');
         currentResults = [];
-        resultsList.innerHTML = `<div class="glass-panel p-5 rounded-xl text-center border border-rose-500/30 text-rose-400 text-sm my-4">
-          ⚠️ ${err.message || "Extraction error: Unable to extract video. Please check the link."}
-        </div>`;
+        const errContainer = document.createElement('div');
+        errContainer.className = "glass-panel p-5 rounded-xl text-center border border-rose-500/30 text-rose-400 text-sm my-4";
+        errContainer.textContent = "⚠️ " + (err.message || "Extraction error: Unable to extract video. Please check the link.");
+        resultsList.innerHTML = '';
+        resultsList.appendChild(errContainer);
       } finally {
         spinner.classList.add('hidden');
       }
@@ -1237,38 +1318,48 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         resultsList.innerHTML = `<div class="glass-panel p-6 rounded-2xl text-center border border-gray-800 my-4">
           <div class="text-3xl mb-2">🔍</div>
           <div class="font-bold text-gray-200 mb-1">No Verified Full Movie Found</div>
-          <div class="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">We strictly filter out trailers, 20-minute recaps, and fake clips to protect your time. If you have a direct video link, paste it into the <b>Sniff URL</b> tab above to stream immediately!</div>
+          <div class="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">We strictly filter out trailers, recaps, and fake clips to protect your time. Check the <b>Official OTT Streaming Platforms</b> above or paste a direct video link into the <b>Sniff URL</b> tab above to stream immediately!</div>
         </div>`;
         return;
       }
 
       resultsList.innerHTML = filtered.map((item, idx) => {
         const isDirect = item.type === 'direct_mp4' || item.type === 'video' || (item.stream_url && item.stream_url.includes('.mp4'));
+        const safeTitle = escapeHtml(item.title);
+        const safeSource = escapeHtml(item.source);
+        const safeBadge = escapeHtml(item.badge || 'Verified Stream');
+        const safeBadgeColor = escapeHtml(item.badge_color || '#06b6d4');
+        const safePrintBadge = escapeHtml(item.print_badge || '💎 Crisp HD');
+        const safePrintColor = escapeHtml(item.print_color || '#10b981');
+        const safeDuration = escapeHtml(item.duration_formatted || 'Stream');
+        const encStreamUrl = encodeURIComponent(item.stream_url || '');
+        const encTitle = encodeURIComponent(item.title || '');
+
         return `
         <div class="glass-panel p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border ${isDirect ? 'border-emerald-500/60 bg-emerald-950/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'border-gray-800/80'} hover:border-gray-700 transition">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-              <h3 class="text-sm sm:text-base font-bold text-white leading-snug">${item.title}</h3>
+              <h3 class="text-sm sm:text-base font-bold text-white leading-snug">${safeTitle}</h3>
               ${isDirect ? `<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-gray-950 shadow">🛡️ Zero Ads • Direct Video</span>` : ''}
             </div>
             <div class="flex items-center gap-2 flex-wrap text-xs">
-              <span class="px-2 py-0.5 rounded font-bold" style="color: ${item.badge_color || '#06b6d4'}; background-color: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.25);">
-                🎯 ${item.confidence}% Match • ${item.badge || 'Verified Stream'}
+              <span class="px-2 py-0.5 rounded font-bold" style="color: ${safeBadgeColor}; background-color: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.25);">
+                ${safeBadge}
               </span>
-              <span class="px-2 py-0.5 rounded font-bold text-white" style="background-color: ${item.print_color || '#10b981'};">
-                ${item.print_badge || '💎 Crisp HD'}
+              <span class="px-2 py-0.5 rounded font-bold text-white" style="background-color: ${safePrintColor};">
+                ${safePrintBadge}
               </span>
-              <span class="px-2 py-0.5 rounded text-gray-300 bg-gray-800">⏱ ${item.duration_formatted || 'Stream'}</span>
-              <span class="text-gray-400 font-semibold">${item.source}</span>
+              <span class="px-2 py-0.5 rounded text-gray-300 bg-gray-800">⏱ ${safeDuration}</span>
+              <span class="text-gray-400 font-semibold">${safeSource}</span>
             </div>
             <div class="flex items-center gap-2 mt-2 flex-wrap">
               ${item.movierulz_search_url ? `
-                <a href="${item.movierulz_search_url}" target="_blank" class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition flex items-center gap-1">
+                <a href="${escapeHtml(item.movierulz_search_url)}" target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition flex items-center gap-1">
                   <span>⚡</span> MovieRulz Mirror
                 </a>
               ` : ''}
               ${item.filmyzilla_search_url ? `
-                <a href="${item.filmyzilla_search_url}" target="_blank" class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 transition flex items-center gap-1">
+                <a href="${escapeHtml(item.filmyzilla_search_url)}" target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 transition flex items-center gap-1">
                   <span>🎬</span> FilmyZilla Mirror
                 </a>
               ` : ''}
@@ -1276,23 +1367,23 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
             ${item.audio_warning ? `
             <div class="text-xs text-amber-300 bg-amber-950/75 border border-amber-800/80 rounded-lg px-3 py-1.5 mt-2 font-medium flex items-center gap-1.5">
               <span>⚠️</span>
-              <span>${item.audio_warning}</span>
+              <span>${escapeHtml(item.audio_warning)}</span>
             </div>
             ` : ''}
             <div id="prog-${idx}" class="text-xs text-cyan-400 mt-2"></div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <select id="q-${idx}" onchange="changeActiveResolution(this.value, '${encodeURIComponent(item.stream_url)}', '${encodeURIComponent(item.title)}')" class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-xs text-white">
+            <select id="q-${idx}" onchange="changeActiveResolution(this.value, '${encStreamUrl}', '${encTitle}')" class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-xs text-white">
               <option value="best">Best Quality</option>
               <option value="1080p">1080p FHD</option>
               <option value="720p">720p HD</option>
               <option value="480p">480p SD</option>
             </select>
-            <button onclick="playStream('${encodeURIComponent(item.stream_url)}', '${encodeURIComponent(item.title)}', ${idx})" 
+            <button onclick="playStream('${encStreamUrl}', '${encTitle}', ${idx})" 
               class="px-4 py-1.5 rounded-lg ${isDirect ? 'bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black shadow-lg shadow-emerald-500/20' : 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow'} text-xs transition active:scale-95 flex items-center gap-1">
               <span>▶</span> <span>${isDirect ? 'Stream (Zero Ads)' : 'Stream'}</span>
             </button>
-            <button id="dl-${idx}" onclick="startDownload('${encodeURIComponent(item.stream_url)}', '${encodeURIComponent(item.title)}', ${idx})" 
+            <button id="dl-${idx}" onclick="startDownload('${encStreamUrl}', '${encTitle}', ${idx})" 
               class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition shadow">
               ⬇ Download
             </button>
@@ -1480,11 +1571,11 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
           list.innerHTML = activeCast.map(c => `
             <div class="flex items-center gap-2 bg-gray-900/90 p-1.5 px-3 rounded-lg border border-gray-800 text-xs shrink-0">
               <div class="w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
-                ${c.name.charAt(0)}
+                ${escapeHtml((c.name || '?').charAt(0))}
               </div>
               <div>
-                <div class="font-bold text-white">${c.name}</div>
-                <div class="text-[10px] text-gray-400">as ${c.role || 'Character'}</div>
+                <div class="font-bold text-white">${escapeHtml(c.name || 'Actor')}</div>
+                <div class="text-[10px] text-gray-400">as ${escapeHtml(c.role || 'Character')}</div>
               </div>
             </div>
           `).join('');
@@ -1859,7 +1950,17 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         if (!box) return;
         const div = document.createElement('div');
         div.className = "p-1.5 rounded-lg bg-gray-950/80 border border-gray-800 text-xs";
-        div.innerHTML = `<span class="font-bold text-indigo-400">${user}:</span> <span class="text-gray-200">${msg}</span>`;
+        
+        const userSpan = document.createElement('span');
+        userSpan.className = "font-bold text-indigo-400";
+        userSpan.textContent = user + ": ";
+
+        const msgSpan = document.createElement('span');
+        msgSpan.className = "text-gray-200";
+        msgSpan.textContent = msg;
+
+        div.appendChild(userSpan);
+        div.appendChild(msgSpan);
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
       });

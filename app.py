@@ -6,25 +6,62 @@ import difflib
 import urllib.parse
 import urllib.request
 import socket
+import ipaddress
 import yt_dlp
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="CinemaHub Ultra")
+app = FastAPI(title="CinemaHub VIP")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def is_safe_url(url: str) -> bool:
+    """Rigorous SSRF validation: rejects loopback, private RFC-1918, link-local, and cloud metadata IPs."""
+    try:
+        if not url or not isinstance(url, str):
+            return False
+        parsed = urllib.parse.urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        
+        lower_host = hostname.lower()
+        if lower_host in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal", "instance-data"):
+            return False
+        if lower_host.endswith(".internal") or lower_host.endswith(".local"):
+            return False
+
+        # Resolve host to IP and verify against private/reserved ranges
+        addr_info = socket.getaddrinfo(hostname, None)
+        for family, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_reserved
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_unspecified
+            ):
+                return False
+        return True
+    except Exception:
+        return False
 
 def get_lan_ip():
     try:
@@ -41,6 +78,7 @@ HOST_IP = get_lan_ip()
 class SearchRequest(BaseModel):
     query: str
     language: str = "English"
+    imdb_id: Optional[str] = None
 
 class MoodSearchRequest(BaseModel):
     mood: str
@@ -660,19 +698,19 @@ VERIFIED_AD_FREE_REGIONAL_STREAMS = {
     ],
     "hanu-man": [
         {
-            "title": "Hanu-Man (2024) • ⚡ 100% Ad-Free Direct Stream (Zero Ads)",
+            "title": "Hanu-Man (2024) • Hindi Audio WEB-DL (1080p)",
             "stream_url": "https://archive.org/download/hanuman-2024-hindi-1080p-web-dl-x-264-aac-2.5-gb-qrips/Hanuman%20%282024%29%20Hindi%201080p%20WEB%20DL%20x264%20AAC%202.5%20GB%20QRips.ia.mp4",
             "size_mb": 2500,
-            "lang": "Telugu",
+            "lang": "Hindi",
             "quality": "1080p FHD"
         }
     ],
     "hanuman": [
         {
-            "title": "Hanu-Man (2024) • ⚡ 100% Ad-Free Direct Stream (Zero Ads)",
+            "title": "Hanu-Man (2024) • Hindi Audio WEB-DL (1080p)",
             "stream_url": "https://archive.org/download/hanuman-2024-hindi-1080p-web-dl-x-264-aac-2.5-gb-qrips/Hanuman%20%282024%29%20Hindi%201080p%20WEB%20DL%20x264%20AAC%202.5%20GB%20QRips.ia.mp4",
             "size_mb": 2500,
-            "lang": "Telugu",
+            "lang": "Hindi",
             "quality": "1080p FHD"
         }
     ],
@@ -706,25 +744,24 @@ def search_indian_regional_sources(query: str, lang: str):
     results = []
     clean_q = clean_text(query).lower().strip()
 
-    # 1. Instant sub-millisecond check against verified zero-ad database
+    # 1. Instant check against verified open archive database
     for key, items in VERIFIED_AD_FREE_REGIONAL_STREAMS.items():
         if key in clean_q or clean_q in key:
             for item in items:
                 results.append({
                     "title": item["title"],
-                    "source": "⚡ CinemaHub Zero-Ad Direct Engine",
+                    "source": "Archive.org Public Repository",
                     "stream_url": item["stream_url"],
                     "type": "direct_mp4",
                     "is_full_movie": True,
                     "is_audio_mismatch": False,
-                    "confidence": 100,
-                    "badge": f"🛡️ Zero Ads • {item.get('lang', lang)} Audio ({item['size_mb']} MB)",
+                    "badge": f"Reported {item.get('lang', lang)} Audio ({item['size_mb']} MB)",
                     "badge_color": "#10b981",
-                    "print_type": f"Original {item.get('lang', lang)} Audio • Direct MP4",
+                    "print_type": f"Direct MP4 Video File",
                     "print_tag": "hd",
                     "print_color": "#059669",
-                    "print_badge": f"💎 {item.get('quality', '1080p MP4')}",
-                    "duration_formatted": f"Full Movie ({item['size_mb']} MB)",
+                    "print_badge": item.get('quality', '1080p MP4'),
+                    "duration_formatted": f"{item['size_mb']} MB MP4",
                     "movierulz_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' movierulz')}",
                     "filmyzilla_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' filmyzilla')}"
                 })
@@ -779,20 +816,19 @@ def search_indian_regional_sources(query: str, lang: str):
                             size_mb = round(size / (1024 * 1024))
                             display_title = d.get("title") or f"{query.title()} ({lang} HQ)"
                             return {
-                                "title": f"{display_title} • ⚡ 100% Ad-Free Direct Stream (Original {lang} Audio)",
-                                "source": "MovieRulz & Indian Regional Cloud",
+                                "title": f"{display_title} • Direct Video File",
+                                "source": "Archive.org Public Repository",
                                 "stream_url": stream_url,
                                 "type": "direct_mp4",
                                 "is_full_movie": True,
                                 "is_audio_mismatch": False,
-                                "confidence": 100,
-                                "badge": f"🛡️ Zero Ads • {lang} Audio ({size_mb} MB)",
+                                "badge": f"Reported {lang} Audio ({size_mb} MB)",
                                 "badge_color": "#10b981",
-                                "print_type": f"Original {lang} Audio • Direct MP4",
+                                "print_type": "Direct Media File",
                                 "print_tag": "hd",
                                 "print_color": "#059669",
-                                "print_badge": f"💎 {lang} 1080p MP4",
-                                "duration_formatted": f"Full Movie ({size_mb} MB)",
+                                "print_badge": f"{lang} MP4",
+                                "duration_formatted": f"{size_mb} MB File",
                                 "movierulz_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' movierulz')}",
                                 "filmyzilla_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' filmyzilla')}"
                             }
@@ -1044,72 +1080,128 @@ def search_movie(req: SearchRequest):
         raise HTTPException(status_code=400, detail="Movie name is required")
         
     query, lang = extract_language_and_clean_query(raw_query, req.language.strip() or "English")
+    
+    # 1. Fetch Canonical Title & Disambiguation Candidates from Cinemeta
+    disambiguation_options = []
+    canonical_meta = None
+    imdb_id = req.imdb_id or None
+    clean_q = clean_text(query)
+    
+    if not imdb_id and clean_q in IMDB_DATABASE:
+        imdb_id = IMDB_DATABASE[clean_q]
+        
+    try:
+        cinemeta_url = f"https://v3-cinemeta.strem.io/catalog/movie/top/search={urllib.parse.quote(query)}.json"
+        req_c = urllib.request.Request(cinemeta_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req_c, timeout=3.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            metas = data.get("metas", [])
+            for m in metas[:6]:
+                m_id = m.get("id") or m.get("imdb_id")
+                m_title = m.get("name")
+                m_year = str(m.get("year", ""))
+                m_poster = m.get("poster")
+                if m_id and m_title:
+                    disambiguation_options.append({
+                        "imdb_id": m_id,
+                        "title": m_title,
+                        "year": m_year,
+                        "poster": m_poster,
+                        "genres": m.get("genres", [])
+                    })
+            if not imdb_id and disambiguation_options:
+                imdb_id = disambiguation_options[0]["imdb_id"]
+    except Exception:
+        pass
+
+    # Detailed canonical metadata
     meta = fetch_local_xray_metadata(query)
-    all_results = search_yt_dlp_sources(query, lang)
-    
-    # Sort results: true language audio first, then full movie, then confidence
-    all_results.sort(key=lambda x: (
-        0 if x.get("is_audio_mismatch") else 1,
-        1 if x.get("is_full_movie") else 0,
-        x.get("confidence", 0)
-    ), reverse=True)
-    
-    imdb_id = get_live_imdb_id(query) or (meta.get("imdb_id") if isinstance(meta, dict) else None)
+    if not meta or not meta.get("poster") or "unsplash" in meta.get("poster", ""):
+        if disambiguation_options:
+            top_cand = disambiguation_options[0]
+            meta = {
+                "has_meta": True,
+                "imdb_id": top_cand["imdb_id"],
+                "title": top_cand["title"],
+                "year": top_cand["year"],
+                "poster": top_cand["poster"],
+                "summary": f"Verified metadata for {top_cand['title']} ({top_cand['year']}).",
+                "rating": "IMDb Verified",
+                "genres": ", ".join(top_cand.get("genres", ["Feature Film"])),
+                "cast": []
+            }
 
-    # Universal Multi-Server Cinema Card (ensures any requested movie can be streamed!)
-    s1 = f"https://vidlink.pro/movie/{imdb_id}" if imdb_id else f"https://vidlink.pro/movie/{urllib.parse.quote(query)}"
-    s2 = f"https://embed.smashystream.com/playere.php?imdb={imdb_id}" if imdb_id else f"https://embed.smashystream.com/playere.php?imdb={urllib.parse.quote(query)}"
-    s3 = f"https://vidsrc.me/embed/movie?imdb={imdb_id}" if imdb_id else f"https://vidsrc.me/embed/movie?imdb={urllib.parse.quote(query)}"
-    s4 = f"https://2embed.cc/embed/{imdb_id}" if imdb_id else f"https://2embed.cc/embed/{urllib.parse.quote(query)}"
+    # 2. Legitimate Watch Providers / Official OTT Options
+    official_watch_providers = [
+        {"name": "Prime Video", "provider": "Amazon", "url": f"https://www.primevideo.com/search/ref=atv_nb_sr?phrase={urllib.parse.quote(query)}"},
+        {"name": "Netflix", "provider": "Netflix", "url": f"https://www.netflix.com/search?q={urllib.parse.quote(query)}"},
+        {"name": "Disney+ Hotstar", "provider": "Disney+", "url": f"https://www.hotstar.com/in/explore?search_query={urllib.parse.quote(query)}"},
+        {"name": "Aha Video", "provider": "Aha (Telugu)", "url": f"https://www.aha.video/search?q={urllib.parse.quote(query)}"},
+        {"name": "Zee5", "provider": "Zee5", "url": f"https://www.zee5.com/search?q={urllib.parse.quote(query)}"}
+    ]
 
-    universal_card = {
-        "title": f"{query.title()} • Full Movie (Universal Cinema Server)",
-        "source": "Multi-Server Cloud (Any Movie)",
-        "stream_url": s1,
-        "servers": {
-            "Server 1 (VidLink HD)": s1,
-            "Server 2 (Smashy Cloud)": s2,
-            "Server 3 (VIP Cloud)": s3,
-            "Server 4 (Fast Mirror)": s4
-        },
-        "imdb_id": imdb_id,
-        "type": "universal_embed",
-        "is_full_movie": True,
-        "confidence": 100,
-        "badge": "Universal Multi-Server HD",
-        "badge_color": "#10b981",
-        "print_type": "Official Multi-Server Stream",
-        "print_tag": "hd",
-        "print_color": "#10b981",
-        "print_badge": "💎 Multi-Server HD",
-        "duration_formatted": "Full Movie (Multi-Server)",
-        "movierulz_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' movierulz')}",
-        "filmyzilla_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' filmyzilla')}"
-    }
-    all_results.insert(0, universal_card)
+    # 3. Confirmed Playback Sources (Factual and Honest)
+    confirmed_playback_sources = []
     
-    # Scrape and prepend Indian regional direct streams (MovieRulz & Indian Regional Cloud)
+    # Regional archive & verified direct streams
     regional_results = search_indian_regional_sources(query, lang)
-    for r in reversed(regional_results):
-        all_results.insert(0, r)
-    
+    for r in regional_results:
+        confirmed_playback_sources.append(r)
+
+    # Official YouTube uploads (if strictly verified)
+    yt_results = search_yt_dlp_sources(query, lang)
+    for yt in yt_results:
+        confirmed_playback_sources.append(yt)
+
+    # Community Cloud Mirrors (Only if canonical IMDb ID exists, and labeled factually)
+    if imdb_id:
+        s1 = f"https://vidlink.pro/movie/{imdb_id}"
+        s2 = f"https://embed.smashystream.com/playere.php?imdb={imdb_id}"
+        s3 = f"https://vidsrc.me/embed/movie?imdb={imdb_id}"
+        s4 = f"https://2embed.cc/embed/{imdb_id}"
+        confirmed_playback_sources.append({
+            "title": f"{query.title()} • Community Cloud Stream",
+            "source": "Third-Party Community Mirror",
+            "stream_url": s1,
+            "servers": {
+                "Server 1 (VidLink HD)": s1,
+                "Server 2 (Smashy Cloud)": s2,
+                "Server 3 (VIP Cloud)": s3,
+                "Server 4 (Fast Mirror)": s4
+            },
+            "imdb_id": imdb_id,
+            "type": "universal_embed",
+            "is_full_movie": False,
+            "badge": "Community Mirror (May contain ads)",
+            "badge_color": "#64748b",
+            "print_type": "Third-Party Web Player",
+            "print_tag": "embed",
+            "print_color": "#475569",
+            "print_badge": "Cloud Player",
+            "duration_formatted": "Third-Party Stream",
+            "movierulz_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' ' + lang + ' movierulz')}",
+            "filmyzilla_search_url": f"https://www.google.com/search?q={urllib.parse.quote(query + ' filmyzilla')}"
+        })
+
     ai_suggestions = get_ai_suggestions_for_movie(query, lang)
-    
+
     return {
         "query": query,
         "language": lang,
         "meta": meta,
-        "results": all_results,
+        "disambiguation": disambiguation_options,
+        "official_providers": official_watch_providers,
+        "results": confirmed_playback_sources,
+        "has_confirmed_sources": len(confirmed_playback_sources) > 0,
         "ai_suggestions": ai_suggestions
     }
 
 @app.post("/api/mood_search")
 def search_by_mood(req: MoodSearchRequest):
     mood_text = req.mood.lower().strip()
-    words = set(re.findall(r'\b[a-z0-9]+\b', mood_text))
 
     def has_any(keywords):
-        return any(k in words or any(w.startswith(k) for w in words) for k in keywords)
+        return any(bool(re.search(r'\b' + re.escape(k.lower()) + r'\b', mood_text)) or (k.lower() in mood_text) for k in keywords)
 
     selected_items = None
     if has_any(["telugu", "tollywood", "south", "vijay", "arjun", "deverakonda", "ram charan", "ntr"]):
@@ -1157,9 +1249,13 @@ def sniff_direct_url(req: DirectUrlRequest):
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
+    if not is_safe_url(url):
+        raise HTTPException(status_code=400, detail="Disallowed or private URL target")
 
     # If direct video file URL
-    if any(url.lower().endswith(ext) for ext in [".mp4", ".m3u8", ".webm", ".mkv"]):
+    parsed = urllib.parse.urlparse(url)
+    clean_path = parsed.path.lower()
+    if any(clean_path.endswith(ext) for ext in [".mp4", ".m3u8", ".webm", ".mkv"]) or ("archive.org/download/" in url):
         return {
             "title": "Direct Web Video",
             "source": "Direct URL",
@@ -1167,13 +1263,12 @@ def sniff_direct_url(req: DirectUrlRequest):
             "type": "direct_sniffed",
             "duration_formatted": "Full Video",
             "is_full_movie": True,
-            "confidence": 100,
             "badge": "Web Stream",
             "badge_color": "#0ea5e9",
-            "print_type": "Official HD / Digital Print",
+            "print_type": "Digital Stream",
             "print_tag": "hd",
             "print_color": "#10b981",
-            "print_badge": "💎 Crisp HD"
+            "print_badge": "Direct Media"
         }
 
     try:
@@ -1191,7 +1286,6 @@ def sniff_direct_url(req: DirectUrlRequest):
                 "type": "direct_sniffed",
                 "duration_formatted": format_duration(duration),
                 "is_full_movie": duration >= 2700,
-                "confidence": 100,
                 "badge": "Web Stream",
                 "badge_color": "#0ea5e9",
                 **print_info
@@ -1201,13 +1295,20 @@ def sniff_direct_url(req: DirectUrlRequest):
 
 @app.get("/api/extract_stream")
 def extract_stream(url: str, quality: str = "best"):
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+    if not is_safe_url(url):
+        raise HTTPException(status_code=400, detail="Disallowed or private URL target")
+
     # Direct playable link
-    if any(url.lower().endswith(ext) for ext in [".mp4", ".m3u8", ".webm", ".mkv"]) or "archive.org" in url:
+    parsed = urllib.parse.urlparse(url)
+    clean_path = parsed.path.lower()
+    if any(clean_path.endswith(ext) for ext in [".mp4", ".m3u8", ".webm", ".mkv"]) or ("archive.org/download/" in url):
         return {"stream_type": "video", "stream_url": url, "title": "Direct Stream"}
 
     # If universal embed or multi-server URL
     if any(k in url.lower() for k in ["multiembed", "vidsrc", "2embed", "autoembed", "superembed", "vidlink", "smashystream", "/embed", "/movie"]):
-        return {"stream_type": "embed", "stream_url": url, "title": "Universal Cinema Stream", "quality": quality}
+        return {"stream_type": "embed", "stream_url": url, "title": "Third-Party Player Embed", "quality": quality}
 
     yt_match = re.search(r'(?:v=|\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})', url)
     if yt_match:
@@ -1289,6 +1390,8 @@ def download_task(task_id: str, url: str, title: str, quality: str, include_subs
 
 @app.post("/api/download")
 def start_download(req: DownloadRequest, bg_tasks: BackgroundTasks):
+    if not is_safe_url(req.url):
+        raise HTTPException(status_code=400, detail="Invalid or disallowed destination URL")
     task_id = f"dl_{len(downloads_status) + 1}_{abs(hash(req.url)) % 10000}"
     downloads_status[task_id] = {"status": "starting", "progress": 0}
     bg_tasks.add_task(download_task, task_id, req.url, req.title, req.quality, req.include_subtitles, req.sub_lang)
