@@ -767,26 +767,26 @@ def search_movie(req: SearchRequest):
     imdb_id = IMDB_DATABASE.get(clean_q) or (meta.get("imdb_id") if isinstance(meta, dict) else None)
 
     # Universal Multi-Server Cinema Card (ensures any requested movie can be streamed!)
-    s1 = f"https://multiembed.mov/?video_id={imdb_id}" if imdb_id else f"https://multiembed.mov/?video_id=&search={urllib.parse.quote(query)}"
-    s2 = f"https://vidsrc.to/embed/movie/{imdb_id}" if imdb_id else f"https://vidsrc.to/embed/movie/{urllib.parse.quote(query)}"
-    s3 = f"https://vidsrc.xyz/embed/movie?imdb={imdb_id}" if imdb_id else f"https://vidsrc.xyz/embed/movie?imdb={urllib.parse.quote(query)}"
-    s4 = f"https://2embed.cc/embed/{imdb_id}" if imdb_id else f"https://2embed.cc/embed/{urllib.parse.quote(query)}"
+    s1 = f"https://vidsrc.to/embed/movie/{imdb_id}" if imdb_id else f"https://vidsrc.to/embed/movie/{urllib.parse.quote(query)}"
+    s2 = f"https://vidsrc.me/embed/movie?imdb={imdb_id}" if imdb_id else f"https://vidsrc.me/embed/movie?imdb={urllib.parse.quote(query)}"
+    s3 = f"https://2embed.cc/embed/{imdb_id}" if imdb_id else f"https://2embed.cc/embed/{urllib.parse.quote(query)}"
+    s4 = f"https://autoembed.co/movie/imdb/{imdb_id}" if imdb_id else f"https://autoembed.co/movie/imdb/{urllib.parse.quote(query)}"
 
     universal_card = {
-        "title": f"{query.title()} • Full Movie (Universal Multi-Server Stream)",
+        "title": f"{query.title()} • Full Movie (Universal Cinema Server)",
         "source": "Multi-Server Cloud (Any Movie)",
         "stream_url": s1,
         "servers": {
             "Server 1 (Ultra HD)": s1,
             "Server 2 (VIP Cloud)": s2,
             "Server 3 (Fast Mirror)": s3,
-            "Server 4 (Stream Mirror)": s4
+            "Server 4 (Alternative)": s4
         },
         "imdb_id": imdb_id,
         "type": "universal_embed",
         "is_full_movie": True,
-        "confidence": 99,
-        "badge": "Multi-Server HD",
+        "confidence": 100,
+        "badge": "Universal Multi-Server HD",
         "badge_color": "#10b981",
         "print_type": "Official Multi-Server Stream",
         "print_tag": "hd",

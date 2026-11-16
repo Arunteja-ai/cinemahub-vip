@@ -324,7 +324,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
       <!-- Movie Spotlight Card -->
       <div id="spotlightCard" class="hidden glass-panel p-4 sm:p-5 rounded-2xl flex gap-4 sm:gap-6 items-center border border-cyan-500/30">
-        <img id="spotlightPoster" src="" alt="Poster" class="w-20 sm:w-28 rounded-xl object-cover shadow-lg border border-gray-700" />
+        <img id="spotlightPoster" src="" alt="Poster" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400'" class="w-20 sm:w-28 rounded-xl object-cover shadow-lg border border-gray-700" />
         <div class="flex-1 flex flex-col gap-1">
           <div class="flex items-center gap-2 flex-wrap">
             <h2 id="spotlightTitle" class="text-base sm:text-xl font-bold text-white"></h2>
@@ -351,6 +351,9 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
               <button id="srvBtn-2" onclick="switchActiveServer(2)" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-800 text-gray-300 hover:text-white transition active:scale-95">🌐 Server 2 (VIP Cloud)</button>
               <button id="srvBtn-3" onclick="switchActiveServer(3)" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-800 text-gray-300 hover:text-white transition active:scale-95">🚀 Server 3 (Fast Mirror)</button>
               <button id="srvBtn-4" onclick="switchActiveServer(4)" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-800 text-gray-300 hover:text-white transition active:scale-95">🎥 Server 4 (Alternative)</button>
+              <a id="popoutStreamBtn" target="_blank" href="#" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/60 flex items-center gap-1 transition ml-auto">
+                <span>↗️</span> Direct Player
+              </a>
             </div>
 
             <!-- Player Top Toolbar -->
@@ -390,7 +393,12 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
             <!-- Video Element & Skip Intro Banner -->
             <div class="relative">
               <video id="mainVideo" controls class="w-full rounded-xl bg-black max-h-[480px] shadow-2xl outline-none"></video>
-              <iframe id="mainEmbed" class="hidden w-full h-[400px] sm:h-[480px] rounded-xl shadow-2xl border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <iframe id="mainEmbed" class="hidden w-full h-[400px] sm:h-[480px] rounded-xl shadow-2xl border-0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" 
+                referrerpolicy="origin" 
+                allowfullscreen>
+              </iframe>
               <button id="skipIntroBtn" onclick="skipIntro()" class="hidden absolute bottom-16 right-6 px-4 py-2 rounded-xl bg-black/80 hover:bg-white hover:text-black border border-white/30 text-white font-bold text-xs backdrop-blur-md transition shadow-2xl z-20">
                 ⏩ Skip Intro (85s)
               </button>
@@ -471,7 +479,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
         <!-- AI Surprise Result Box -->
         <div id="aiSurpriseBox" class="hidden p-4 rounded-xl bg-gray-950/90 border border-amber-500/40 flex flex-col sm:flex-row gap-4 items-center">
-          <img id="surprisePoster" src="" class="w-20 h-28 object-cover rounded-lg border border-amber-500/30" />
+          <img id="surprisePoster" src="" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-20 h-28 object-cover rounded-lg border border-amber-500/30" />
           <div class="flex-1 flex flex-col gap-1 text-left">
             <div class="flex items-center gap-2">
               <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">AI Masterpiece Pick</span>
@@ -1090,7 +1098,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         if (data.ai_suggestions && data.ai_suggestions.length > 0) {
           aiCards.innerHTML = data.ai_suggestions.map(s => `
             <div onclick="applySuggestion('${s.title}', '${s.lang || 'Telugu'}')" class="glass-panel p-2 rounded-xl cursor-pointer hover:border-purple-500/50 hover:scale-[1.02] transition flex flex-col gap-1 group">
-              <img src="${s.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" class="w-full h-28 sm:h-32 object-cover rounded-lg" />
+              <img src="${s.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-28 sm:h-32 object-cover rounded-lg" />
               <div class="text-xs font-bold text-white truncate">${s.title}</div>
               <div class="text-[10px] text-purple-300 font-medium truncate">${s.badge || s.lang} • ${s.year || ''}</div>
               <button class="mt-1 w-full py-1 text-[11px] rounded bg-purple-600/80 group-hover:bg-purple-600 text-white font-bold transition">▶ Stream</button>
@@ -1142,7 +1150,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         const data = await res.json();
         moodCards.innerHTML = data.recommendations.map(m => `
           <div onclick="selectMoodMovie('${m.title}')" class="glass-panel p-2.5 rounded-xl cursor-pointer hover:border-purple-500/50 transition flex flex-col gap-1.5 group">
-            <img src="${m.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" class="w-full h-36 object-cover rounded-lg group-hover:scale-105 transition" />
+            <img src="${m.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'" class="w-full h-36 object-cover rounded-lg group-hover:scale-105 transition" />
             <div class="text-xs font-bold text-white truncate">${m.title}</div>
             <div class="text-[10px] text-amber-400">★ ${m.rating} • ${m.genres}</div>
           </div>
@@ -1273,10 +1281,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         activeServers[3] = targetItem.servers["Server 3 (Fast Mirror)"] || rawUrl;
         activeServers[4] = targetItem.servers["Server 4 (Alternative)"] || targetItem.servers["Server 4 (Stream Mirror)"] || rawUrl;
       } else {
-        activeServers[1] = rawUrl;
-        activeServers[2] = imdbId ? `https://vidsrc.to/embed/movie/${imdbId}` : `https://vidsrc.to/embed/movie/${encodeURIComponent(title)}`;
-        activeServers[3] = imdbId ? `https://vidsrc.xyz/embed/movie?imdb=${imdbId}` : `https://vidsrc.xyz/embed/movie?imdb=${encodeURIComponent(title)}`;
-        activeServers[4] = imdbId ? `https://2embed.cc/embed/${imdbId}` : `https://2embed.cc/embed/${encodeURIComponent(title)}`;
+        activeServers[1] = imdbId ? `https://vidsrc.to/embed/movie/${imdbId}` : rawUrl;
+        activeServers[2] = imdbId ? `https://vidsrc.me/embed/movie?imdb=${imdbId}` : `https://vidsrc.me/embed/movie?imdb=${encodeURIComponent(title)}`;
+        activeServers[3] = imdbId ? `https://2embed.cc/embed/${imdbId}` : `https://2embed.cc/embed/${encodeURIComponent(title)}`;
+        activeServers[4] = imdbId ? `https://autoembed.co/movie/imdb/${imdbId}` : `https://autoembed.co/movie/imdb/${encodeURIComponent(title)}`;
       }
 
       currentActiveServerNum = 1;
@@ -1342,6 +1350,8 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         videoPlayer.pause();
         embedPlayer.classList.remove('hidden');
         embedPlayer.src = streamUrl;
+        const popout = document.getElementById('popoutStreamBtn');
+        if (popout) popout.href = streamUrl;
       } else {
         embedPlayer.classList.add('hidden');
         embedPlayer.src = "";
