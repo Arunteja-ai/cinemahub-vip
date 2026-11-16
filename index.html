@@ -293,6 +293,17 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         </button>
       </div>
 
+      <!-- Instant AI Suggestions Bar -->
+      <div class="flex items-center gap-2 pt-1 flex-wrap text-xs">
+        <span class="text-cyan-400 font-bold flex items-center gap-1">✨ AI Suggestions:</span>
+        <button onclick="applySuggestion('Arjun Reddy', 'Telugu')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">🎬 Arjun Reddy (Telugu)</button>
+        <button onclick="applySuggestion('Dear Comrade', 'Telugu')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">❤️ Dear Comrade</button>
+        <button onclick="applySuggestion('Geetha Govindam', 'Telugu')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">🌟 Geetha Govindam</button>
+        <button onclick="applySuggestion('World Famous Lover', 'Telugu')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">🎬 World Famous Lover</button>
+        <button onclick="applySuggestion('RRR', 'Telugu')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">⚔️ RRR</button>
+        <button onclick="applySuggestion('Inception', 'English')" class="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-cyan-950 hover:text-cyan-300 text-gray-300 border border-gray-700/50 transition">🌀 Inception</button>
+      </div>
+
       <!-- Print Filter Pills -->
       <div class="flex items-center gap-2 pt-2 border-t border-gray-800/80 flex-wrap">
         <span class="text-xs font-semibold text-gray-400">Quality Filter:</span>
@@ -305,7 +316,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
     <!-- AI Mood Vibe Section -->
     <div id="moodBox" class="hidden glass-panel p-4 sm:p-6 rounded-2xl flex flex-col gap-4 shadow-xl">
       <div class="flex flex-col sm:flex-row gap-3">
-        <input type="text" id="moodInput" placeholder="Describe the vibe (e.g. 'mind-bending sci-fi', 'edge of seat thriller', 'cozy feel-good')..." 
+        <input type="text" id="moodInput" placeholder="Describe the vibe (e.g. 'mind-bending sci-fi', 'edge of seat thriller', 'cozy feel-good', 'telugu romance')..." 
           onkeydown="if(event.key==='Enter') searchMood()"
           class="flex-1 px-4 py-3 rounded-xl bg-gray-950/70 border border-gray-700/60 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 text-sm sm:text-base transition" />
         <button onclick="searchMood()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 text-white font-bold text-sm sm:text-base shadow-lg shadow-purple-500/25 transition">
@@ -314,6 +325,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       </div>
       <div class="flex items-center gap-2 flex-wrap text-xs">
         <span class="text-gray-400">Quick Vibes:</span>
+        <button onclick="quickMood('telugu romance and action blockbusters')" class="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-cyan-300 font-semibold">🎬 Telugu Hits</button>
         <button onclick="quickMood('mind-bending sci-fi')" class="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">🌀 Mind-Bending</button>
         <button onclick="quickMood('edge of seat thriller')" class="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">🔪 Thriller</button>
         <button onclick="quickMood('epic action & warfare')" class="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">⚔️ Epic Action</button>
@@ -465,6 +477,18 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
     <!-- Results List -->
     <div id="resultsList" class="flex flex-col gap-3"></div>
+
+    <!-- Related AI Suggestions Section -->
+    <div id="aiSuggestionsSection" class="hidden glass-panel p-4 sm:p-5 rounded-2xl flex flex-col gap-3 shadow-xl border border-purple-500/20 my-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+          <span class="text-purple-400">✨</span>
+          <span>AI Recommended Movies for You</span>
+        </h3>
+        <span class="text-[11px] text-purple-400 font-semibold bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-800/40">Curated AI Hits</span>
+      </div>
+      <div id="aiSuggestionsCards" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3"></div>
+    </div>
 
   </div>
 
@@ -788,6 +812,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
       // Clear obsolete spotlight cards and stale results when switching tabs
       document.getElementById('spotlightCard').classList.add('hidden');
+      document.getElementById('aiSuggestionsSection').classList.add('hidden');
       document.getElementById('resultsList').innerHTML = '';
       currentResults = [];
     }
@@ -837,9 +862,13 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         }
         const data = await res.json();
         
+        if (data.language) {
+          document.getElementById('langInput').value = data.language;
+        }
+
         if (data.meta && data.meta.has_meta && data.meta.poster) {
           document.getElementById('spotlightPoster').src = data.meta.poster;
-          document.getElementById('spotlightTitle').innerText = query;
+          document.getElementById('spotlightTitle').innerText = data.query || query;
           document.getElementById('spotlightYear').innerText = data.meta.year || "Movie";
           document.getElementById('spotlightRating').innerText = `★ ${data.meta.rating}`;
           document.getElementById('spotlightGenre').innerText = data.meta.genres;
@@ -848,9 +877,27 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
           activeCast = data.meta.cast || [];
         }
 
+        // Render Related AI Suggestions
+        const aiSec = document.getElementById('aiSuggestionsSection');
+        const aiCards = document.getElementById('aiSuggestionsCards');
+        if (data.ai_suggestions && data.ai_suggestions.length > 0) {
+          aiCards.innerHTML = data.ai_suggestions.map(s => `
+            <div onclick="applySuggestion('${s.title}', '${s.lang || 'Telugu'}')" class="glass-panel p-2 rounded-xl cursor-pointer hover:border-purple-500/50 hover:scale-[1.02] transition flex flex-col gap-1 group">
+              <img src="${s.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300'}" class="w-full h-28 sm:h-32 object-cover rounded-lg" />
+              <div class="text-xs font-bold text-white truncate">${s.title}</div>
+              <div class="text-[10px] text-purple-300 font-medium truncate">${s.badge || s.lang} • ${s.year || ''}</div>
+              <button class="mt-1 w-full py-1 text-[11px] rounded bg-purple-600/80 group-hover:bg-purple-600 text-white font-bold transition">▶ Stream</button>
+            </div>
+          `).join('');
+          aiSec.classList.remove('hidden');
+        } else {
+          aiSec.classList.add('hidden');
+        }
+
         currentResults = data.results || [];
         renderResults(currentResults);
       } catch (err) {
+        document.getElementById('aiSuggestionsSection').classList.add('hidden');
         spotlightCard.classList.add('hidden');
         currentResults = [];
         resultsList.innerHTML = `<div class="glass-panel p-5 rounded-xl text-center border border-rose-500/30 text-rose-400 text-sm my-4">
@@ -859,6 +906,14 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       } finally {
         spinner.classList.add('hidden');
       }
+    }
+
+    function applySuggestion(title, lang) {
+      setMode('search');
+      document.getElementById('movieInput').value = title;
+      if (lang) document.getElementById('langInput').value = lang;
+      searchMovie();
+    }
     }
 
     async function quickMood(vibe) {
@@ -959,13 +1014,21 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
           <div class="flex-1">
             <h3 class="text-sm sm:text-base font-bold text-white mb-1.5 leading-snug">${item.title}</h3>
             <div class="flex items-center gap-2 flex-wrap text-xs">
-              <span class="px-2 py-0.5 rounded font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-800/50">🎯 ${item.confidence}% Match</span>
+              <span class="px-2 py-0.5 rounded font-bold" style="color: ${item.badge_color || '#06b6d4'}; background-color: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.25);">
+                🎯 ${item.confidence}% Match • ${item.badge || 'Verified Stream'}
+              </span>
               <span class="px-2 py-0.5 rounded font-bold text-white" style="background-color: ${item.print_color || '#10b981'};">
                 ${item.print_badge || '💎 Crisp HD'}
               </span>
               <span class="px-2 py-0.5 rounded text-gray-300 bg-gray-800">⏱ ${item.duration_formatted || 'Stream'}</span>
               <span class="text-gray-500">${item.source}</span>
             </div>
+            ${item.audio_warning ? `
+            <div class="text-xs text-amber-300 bg-amber-950/75 border border-amber-800/80 rounded-lg px-3 py-1.5 mt-2 font-medium flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>${item.audio_warning}</span>
+            </div>
+            ` : ''}
             <div id="prog-${idx}" class="text-xs text-cyan-400 mt-2"></div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">

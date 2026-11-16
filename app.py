@@ -80,6 +80,13 @@ HD_PRINT_KEYWORDS = [
 ]
 
 MOOD_PRESETS = {
+    "telugu": [
+        {"title": "Arjun Reddy", "year": "2017", "rating": "8.0", "genres": "Drama, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BNmU2N2QzMTktYTQ4Zi00OTBkLTkxZTQtMjk1M2Y2NGQ2ZGVlXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "A short-tempered house surgeon gets used to drugs and drinks when his girlfriend is forced to marry another person."},
+        {"title": "RRR", "year": "2022", "rating": "8.8", "genres": "Action, Drama", "poster": "https://m.media-amazon.com/images/M/MV5BODUwNDNjMTctODUxNy00ZTA2LWIyYTEtMDc5Y2E5NjBmNTMzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "A fearless revolutionary and an officer in the British force decide to join forces and chart out a path towards freedom."},
+        {"title": "Dear Comrade", "year": "2019", "rating": "7.3", "genres": "Action, Drama, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BZjRiZTU3NmUtODk4Yy00MDkxLTk1NDItODZlNDk5ZjkyNTU5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "Bobby, a student union leader with anger issues, falls in love with Lilly, a state-level cricketer, but his temper threatens to tear them apart."},
+        {"title": "Geetha Govindam", "year": "2018", "rating": "7.7", "genres": "Comedy, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BNjE4OGY5OTItYWM0MC00YjBhLTg4YmEtYzA4NjVlNTBiMDhjXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "A young lecturer falls for an independent woman, but an awkward misunderstanding ruins their first encounter."},
+        {"title": "World Famous Lover", "year": "2020", "rating": "5.3", "genres": "Drama, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BYzA2YzdiY2QtMDVjZS00N2EzLWExOWItZjEyN2ZkZjExMWYyXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "An amalgamation of four different love stories that explores the agony and romance of relationships."}
+    ],
     "mind-bending": [
         {"title": "Interstellar", "year": "2014", "rating": "8.7", "genres": "Sci-Fi, Adventure", "poster": "https://m.media-amazon.com/images/M/MV5BYzdjMDAxZGItMjI2My00ODA1LTlkNzItOWFjMDU5ZDJlYWY3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", "summary": "When Earth becomes uninhabitable in the future, a farmer and ex-NASA pilot is tasked to pilot a spacecraft along with a team of researchers to find a new planet for humans."},
         {"title": "Inception", "year": "2010", "rating": "8.8", "genres": "Action, Sci-Fi", "poster": "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_FMjpg_UX1000_.jpg", "summary": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O."},
@@ -215,22 +222,52 @@ def verify_movie_result(search_query: str, language: str, title: str, duration_s
         return None
 
     lang_lower = language.lower()
-    has_lang_mention = lang_lower in title_lower or lang_lower == "english"
+    
+    # Audio language detection
+    is_hindi_dubbed = any(k in title_lower for k in [
+        "hindi dubbed", "dubbed in hindi", "in hindi", "hindi movie", "south hindi dubbed", "hindi version"
+    ])
+    is_telugu_audio = any(k in title_lower for k in [
+        "telugu full length", "telugu movie", "telugu cinema", "telugu full movie", "original telugu", "telugu hd"
+    ]) and not is_hindi_dubbed
+    is_tamil_audio = any(k in title_lower for k in [
+        "tamil full movie", "tamil movie", "tamil cinema", "tamil hd"
+    ]) and not is_hindi_dubbed
+
+    is_audio_mismatch = False
+    warning_note = None
+
+    if (lang_lower == "telugu" or "telug" in lang_lower) and is_hindi_dubbed:
+        is_audio_mismatch = True
+        warning_note = "⚠️ Audio: Hindi Dubbed (Original Telugu restricted to streaming services)"
+    elif (lang_lower == "tamil" or "tam" in lang_lower) and is_hindi_dubbed:
+        is_audio_mismatch = True
+        warning_note = "⚠️ Audio: Hindi Dubbed (Tamil audio not detected)"
+    elif lang_lower not in ["hindi", "all", "other"] and is_hindi_dubbed:
+        is_audio_mismatch = True
+        warning_note = f"⚠️ Audio: Hindi Dubbed (Not {language})"
+
     duration_str = format_duration(duration_sec) if duration_sec else "Full Movie"
     is_full_length = (duration_sec >= 2700) if duration_sec else True
     
+    confidence_score = int(sim * 55 + 35)
     badge = "Verified Full Movie"
     badge_color = "#10b981"
-    confidence_score = int(sim * 55 + 35)
 
-    if has_lang_mention and sim >= 0.6:
+    if is_audio_mismatch:
+        confidence_score = max(42, confidence_score - 25)
+        badge = "Hindi Dubbed Audio"
+        badge_color = "#f59e0b"
+    elif (lang_lower in title_lower or lang_lower == "english" or is_telugu_audio) and sim >= 0.6:
         confidence_score = min(98, confidence_score + 10)
 
-    confidence_score = min(100, max(45, confidence_score))
+    confidence_score = min(100, max(40, confidence_score))
     print_info = detect_print_quality(title, desc)
 
     return {
         "is_full_movie": is_full_length,
+        "is_audio_mismatch": is_audio_mismatch,
+        "audio_warning": warning_note,
         "badge": badge,
         "badge_color": badge_color,
         "confidence": confidence_score,
@@ -239,6 +276,31 @@ def verify_movie_result(search_query: str, language: str, title: str, duration_s
     }
 
 MOVIE_CAST_DATABASE = {
+    "arjun reddy": [
+        {"name": "Vijay Deverakonda", "role": "Dr. Arjun Reddy Deshmukh"},
+        {"name": "Shalini Pandey", "role": "Dr. Preethi Shetty"},
+        {"name": "Rahul Ramakrishna", "role": "Shiva (Best Friend)"},
+        {"name": "Jia Sharma", "role": "Jia"},
+        {"name": "Sandeep Reddy Vanga", "role": "Director"}
+    ],
+    "dear comrade": [
+        {"name": "Vijay Deverakonda", "role": "Comrade Chaitanya (Bobby)"},
+        {"name": "Rashmika Mandanna", "role": "Aparna Devi (Lilly)"},
+        {"name": "Shruti Ramachandran", "role": "Jaya"},
+        {"name": "Bharat Kamma", "role": "Director"}
+    ],
+    "geetha govindam": [
+        {"name": "Vijay Deverakonda", "role": "Vijay Govind"},
+        {"name": "Rashmika Mandanna", "role": "Geetha"},
+        {"name": "Subbaraju", "role": "Phaneendra"},
+        {"name": "Parasuram", "role": "Director"}
+    ],
+    "world famous lover": [
+        {"name": "Vijay Deverakonda", "role": "Gautham / Seenayya"},
+        {"name": "Raashii Khanna", "role": "Yamini"},
+        {"name": "Aishwarya Rajesh", "role": "Suvarna"},
+        {"name": "Kranthi Madhav", "role": "Director"}
+    ],
     "inception": [
         {"name": "Leonardo DiCaprio", "role": "Dom Cobb (Extractor)"},
         {"name": "Joseph Gordon-Levitt", "role": "Arthur (Point Man)"},
@@ -541,24 +603,99 @@ def get_config():
         "port": 8000
     }
 
+LANGUAGE_ALIASES = {
+    "telugu": ["telug", "telugu"],
+    "hindi": ["hind", "hindi"],
+    "tamil": ["tam", "tamil"],
+    "malayalam": ["malayalam", "malyalam"],
+    "kannada": ["kannada"],
+    "english": ["eng", "english"],
+    "spanish": ["spanish", "espanol"],
+    "french": ["french", "francais"],
+    "japanese": ["japanese", "anime"],
+    "korean": ["korean", "k-drama", "kdrama"]
+}
+
+def extract_language_and_clean_query(raw_query: str, selected_lang: str):
+    cleaned_words = []
+    detected_lang = selected_lang
+    for w in raw_query.split():
+        clean_w = re.sub(r'[^a-zA-Z0-9]', '', w).lower()
+        matched = None
+        for lname, aliases in LANGUAGE_ALIASES.items():
+            if clean_w in aliases:
+                matched = lname.capitalize()
+                break
+        if matched:
+            detected_lang = matched
+        else:
+            cleaned_words.append(w)
+    return (' '.join(cleaned_words).strip() or raw_query), detected_lang
+
+def get_ai_suggestions_for_movie(query: str, lang: str):
+    clean_q = clean_text(query)
+    if lang.lower() == "telugu" or any(w in clean_q for w in ["arjun", "reddy", "telugu", "telug", "vijay", "deverakonda", "rrr", "salaar", "kalki"]):
+        return [
+            {"title": "Dear Comrade", "lang": "Telugu", "badge": "Vijay Deverakonda Hit", "year": "2019", "genres": "Action, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BZjRiZTU3NmUtODk4Yy00MDkxLTk1NDItODZlNDk5ZjkyNTU5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+            {"title": "Geetha Govindam", "lang": "Telugu", "badge": "Superhit Rom-Com", "year": "2018", "genres": "Romance, Comedy", "poster": "https://m.media-amazon.com/images/M/MV5BNjE4OGY5OTItYWM0MC00YjBhLTg4YmEtYzA4NjVlNTBiMDhjXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+            {"title": "World Famous Lover", "lang": "Telugu", "badge": "Full Telugu Stream", "year": "2020", "genres": "Drama, Romance", "poster": "https://m.media-amazon.com/images/M/MV5BYzA2YzdiY2QtMDVjZS00N2EzLWExOWItZjEyN2ZkZjExMWYyXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+            {"title": "RRR", "lang": "Telugu", "badge": "Action Blockbuster", "year": "2022", "genres": "Action, Epic", "poster": "https://m.media-amazon.com/images/M/MV5BODUwNDNjMTctODUxNy00ZTA2LWIyYTEtMDc5Y2E5NjBmNTMzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+            {"title": "Joe", "lang": "Telugu", "badge": "Verified Stream", "year": "2023", "genres": "Romance, Drama", "poster": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400"}
+        ]
+    return [
+        {"title": "Inception", "lang": "English", "badge": "Sci-Fi Classic", "year": "2010", "genres": "Sci-Fi, Thriller", "poster": "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_FMjpg_UX1000_.jpg"},
+        {"title": "Interstellar", "lang": "English", "badge": "Nolan Masterpiece", "year": "2014", "genres": "Sci-Fi, Adventure", "poster": "https://m.media-amazon.com/images/M/MV5BYzdjMDAxZGItMjI2My00ODA1LTlkNzItOWFjMDU5ZDJlYWY3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+        {"title": "Shutter Island", "lang": "English", "badge": "Mind-Bending", "year": "2010", "genres": "Mystery, Thriller", "poster": "https://m.media-amazon.com/images/M/MV5BN2FjNWExNDEtYjc4NC00YTE1LWEwODctZDVlMGYwNzg4MGQ2XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
+        {"title": "Gladiator", "lang": "English", "badge": "Epic Cinema", "year": "2000", "genres": "Action, Drama", "poster": "https://m.media-amazon.com/images/M/MV5BYWQ4YmNjYjEtOWE1Zi00Y2U4LWI4NTAtMTU0MjkxNWQ1ZmJiXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"}
+    ]
+
+@app.get("/api/suggestions")
+def get_live_suggestions(q: str = ""):
+    clean_q = clean_text(q)
+    popular = [
+        {"title": "Arjun Reddy", "lang": "Telugu", "year": "2017"},
+        {"title": "Dear Comrade", "lang": "Telugu", "year": "2019"},
+        {"title": "Geetha Govindam", "lang": "Telugu", "year": "2018"},
+        {"title": "World Famous Lover", "lang": "Telugu", "year": "2020"},
+        {"title": "RRR", "lang": "Telugu", "year": "2022"},
+        {"title": "Joe", "lang": "Telugu", "year": "2023"},
+        {"title": "Inception", "lang": "English", "year": "2010"},
+        {"title": "Interstellar", "lang": "English", "year": "2014"},
+        {"title": "Shutter Island", "lang": "English", "year": "2010"},
+        {"title": "The Dark Knight", "lang": "English", "year": "2008"},
+        {"title": "Gladiator", "lang": "English", "year": "2000"},
+        {"title": "Dune", "lang": "English", "year": "2021"}
+    ]
+    if not clean_q:
+        return {"suggestions": popular[:6]}
+    matches = [s for s in popular if clean_q in clean_text(s["title"]) or clean_q in s["lang"].lower()]
+    return {"suggestions": (matches or popular[:4])[:6]}
+
 @app.post("/api/search")
 def search_movie(req: SearchRequest):
-    query = req.query.strip()
-    lang = req.language.strip() or "English"
-    if not query:
+    raw_query = req.query.strip()
+    if not raw_query:
         raise HTTPException(status_code=400, detail="Movie name is required")
         
+    query, lang = extract_language_and_clean_query(raw_query, req.language.strip() or "English")
     meta = fetch_local_xray_metadata(query)
     all_results = search_yt_dlp_sources(query, lang)
     
+    # Sort results: true language audio first, then full movie, then confidence
     all_results.sort(key=lambda x: (
+        0 if x.get("is_audio_mismatch") else 1,
         1 if x.get("is_full_movie") else 0,
         x.get("confidence", 0)
     ), reverse=True)
     
+    ai_suggestions = get_ai_suggestions_for_movie(query, lang)
+    
     return {
+        "query": query,
+        "language": lang,
         "meta": meta,
-        "results": all_results
+        "results": all_results,
+        "ai_suggestions": ai_suggestions
     }
 
 @app.post("/api/mood_search")
@@ -570,7 +707,9 @@ def search_by_mood(req: MoodSearchRequest):
         return any(k in words or any(w.startswith(k) for w in words) for k in keywords)
 
     selected_items = None
-    if has_any(["thrill", "murder", "mystery", "crime", "detective", "psychological", "suspense", "investigat"]):
+    if has_any(["telugu", "tollywood", "south", "vijay", "arjun", "deverakonda", "ram charan", "ntr"]):
+        selected_items = MOOD_PRESETS["telugu"]
+    elif has_any(["thrill", "murder", "mystery", "crime", "detective", "psychological", "suspense", "investigat"]):
         selected_items = MOOD_PRESETS["thriller"]
     elif has_any(["ocean", "sea", "nature", "animal", "documentary", "planet", "wildlife", "marine", "underwater", "creature"]):
         selected_items = MOOD_PRESETS["nature-documentary"]
@@ -583,7 +722,7 @@ def search_by_mood(req: MoodSearchRequest):
     elif has_any(["cozy", "feel", "comedy", "funny", "laugh", "romance", "love", "heart"]):
         selected_items = MOOD_PRESETS["cozy"]
     else:
-        selected_items = MOOD_PRESETS["mind-bending"]
+        selected_items = MOOD_PRESETS["telugu"] if ("telug" in mood_text) else MOOD_PRESETS["mind-bending"]
         
     return {
         "mood": req.mood,
