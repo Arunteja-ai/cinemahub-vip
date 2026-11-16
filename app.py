@@ -1126,6 +1126,10 @@ def get_sw():
     sw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sw.js")
     return FileResponse(sw_path, media_type="application/javascript")
 
+@app.get("/favicon.ico")
+def get_favicon():
+    return Response(status_code=204)
+
 @app.get("/googleeeae74686c9dc05e.html", response_class=PlainTextResponse)
 def get_google_verification():
     return "google-site-verification: googleeeae74686c9dc05e.html"
