@@ -1,0 +1,22 @@
+{
+  "name": "CinemaHub Ultra",
+  "short_name": "CinemaHub",
+  "description": "Stream verified HD movies, Watch Party with friends, and instant downloads with zero ads.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#06b6d4",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3172/3172551.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3172/3172551.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
