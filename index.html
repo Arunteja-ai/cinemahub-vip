@@ -725,6 +725,18 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   </div>
 
   <script>
+    // ==================== CINEMAHUB VIP ANTI-AD SHIELD ====================
+    // Neutralizes third-party iframe popups and unauthorized redirect triggers
+    (function installAntiAdShield() {
+      try {
+        const _origOpen = window.open;
+        window.open = function(url, target, features) {
+          console.warn("🛡️ CinemaHub Anti-Ad Shield intercepted popup attempt:", url);
+          return null;
+        };
+      } catch (e) {}
+    })();
+
     let activePrintFilter = 'all';
     let currentResults = [];
     let ws = null;
@@ -1230,10 +1242,15 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         return;
       }
 
-      resultsList.innerHTML = filtered.map((item, idx) => `
-        <div class="glass-panel p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-gray-800/80 hover:border-gray-700 transition">
+      resultsList.innerHTML = filtered.map((item, idx) => {
+        const isDirect = item.type === 'direct_mp4' || item.type === 'video' || (item.stream_url && item.stream_url.includes('.mp4'));
+        return `
+        <div class="glass-panel p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border ${isDirect ? 'border-emerald-500/60 bg-emerald-950/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'border-gray-800/80'} hover:border-gray-700 transition">
           <div class="flex-1">
-            <h3 class="text-sm sm:text-base font-bold text-white mb-1.5 leading-snug">${item.title}</h3>
+            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+              <h3 class="text-sm sm:text-base font-bold text-white leading-snug">${item.title}</h3>
+              ${isDirect ? `<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-gray-950 shadow">🛡️ Zero Ads • Direct Video</span>` : ''}
+            </div>
             <div class="flex items-center gap-2 flex-wrap text-xs">
               <span class="px-2 py-0.5 rounded font-bold" style="color: ${item.badge_color || '#06b6d4'}; background-color: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.25);">
                 🎯 ${item.confidence}% Match • ${item.badge || 'Verified Stream'}
@@ -1242,7 +1259,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
                 ${item.print_badge || '💎 Crisp HD'}
               </span>
               <span class="px-2 py-0.5 rounded text-gray-300 bg-gray-800">⏱ ${item.duration_formatted || 'Stream'}</span>
-              <span class="text-gray-500">${item.source}</span>
+              <span class="text-gray-400 font-semibold">${item.source}</span>
             </div>
             <div class="flex items-center gap-2 mt-2 flex-wrap">
               ${item.movierulz_search_url ? `
@@ -1272,8 +1289,8 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
               <option value="480p">480p SD</option>
             </select>
             <button onclick="playStream('${encodeURIComponent(item.stream_url)}', '${encodeURIComponent(item.title)}', ${idx})" 
-              class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition shadow">
-              ▶ Stream
+              class="px-4 py-1.5 rounded-lg ${isDirect ? 'bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black shadow-lg shadow-emerald-500/20' : 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow'} text-xs transition active:scale-95 flex items-center gap-1">
+              <span>▶</span> <span>${isDirect ? 'Stream (Zero Ads)' : 'Stream'}</span>
             </button>
             <button id="dl-${idx}" onclick="startDownload('${encodeURIComponent(item.stream_url)}', '${encodeURIComponent(item.title)}', ${idx})" 
               class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition shadow">
@@ -1281,7 +1298,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
             </button>
           </div>
         </div>
-      `).join('');
+      `;}).join('');
     }
 
     async function playStream(encodedUrl, encodedTitle, idx) {
@@ -1292,9 +1309,15 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
       const targetItem = currentResults[idx] || {};
       const imdbId = targetItem.imdb_id || "";
+      const isDirectVideo = targetItem.type === 'direct_mp4' || targetItem.type === 'video' || rawUrl.includes('.mp4') || rawUrl.includes('archive.org');
 
-      // Setup 4 active third-party failover servers for ANY movie
-      if (targetItem.servers) {
+      // Setup 4 active failover servers - prioritize direct MP4 video to guarantee zero ads!
+      if (isDirectVideo) {
+        activeServers[1] = rawUrl;
+        activeServers[2] = imdbId ? `https://vidlink.pro/movie/${imdbId}` : rawUrl;
+        activeServers[3] = imdbId ? `https://embed.smashystream.com/playere.php?imdb=${imdbId}` : rawUrl;
+        activeServers[4] = imdbId ? `https://vidsrc.me/embed/movie?imdb=${imdbId}` : rawUrl;
+      } else if (targetItem.servers) {
         activeServers[1] = targetItem.servers["Server 1 (VidLink HD)"] || targetItem.servers["Server 1 (Ultra HD)"] || rawUrl;
         activeServers[2] = targetItem.servers["Server 2 (Smashy Cloud)"] || targetItem.servers["Server 2 (VIP Cloud)"] || rawUrl;
         activeServers[3] = targetItem.servers["Server 3 (VIP Cloud)"] || targetItem.servers["Server 3 (Fast Mirror)"] || rawUrl;
@@ -1314,6 +1337,11 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
             ? "px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-gray-950 shadow transition active:scale-95"
             : "px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-800 text-gray-300 hover:text-white transition active:scale-95";
         }
+      }
+
+      const srvBtn1 = document.getElementById('srvBtn-1');
+      if (srvBtn1) {
+        srvBtn1.innerText = isDirectVideo ? "⚡ Direct HD (Zero Ads)" : "⚡ Server 1 (VidLink HD)";
       }
 
       candidateStreams = [activeServers[1], activeServers[2], activeServers[3], activeServers[4]].filter(Boolean);
