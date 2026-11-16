@@ -716,35 +716,62 @@ def get_live_suggestions(q: str = ""):
     return {"suggestions": (matches or popular[:4])[:6]}
 
 IMDB_DATABASE = {
-    "arjun reddy": "tt7294334",
+    "arjun reddy": "tt7294534",
     "inception": "tt1375666",
     "interstellar": "tt0816692",
     "the matrix": "tt0133093",
     "tenet": "tt6723592",
     "gladiator": "tt0172495",
-    "gladiator 2": "tt21066510",
-    "gladiator ii": "tt21066510",
+    "gladiator 2": "tt9218128",
+    "gladiator ii": "tt9218128",
     "shutter island": "tt1130884",
     "rrr": "tt8178634",
-    "joe": "tt28236752",
     "dune": "tt1160419",
     "dune 2": "tt15239678",
     "dune part two": "tt15239678",
     "the dark knight": "tt0468569",
-    "dear comrade": "tt8914570",
-    "geetha govindam": "tt8385474",
-    "world famous lover": "tt10499696",
+    "dear comrade": "tt8388508",
+    "geetha govindam": "tt8590896",
+    "world famous lover": "tt10991188",
     "pushpa": "tt9389998",
-    "pushpa 2": "tt15401334",
+    "pushpa the rise": "tt9389998",
+    "pushpa 2": "tt16539454",
+    "pushpa the rule": "tt16539454",
     "kalki": "tt12735488",
     "kalki 2898 ad": "tt12735488",
-    "salaar": "tt13927970",
+    "salaar": "tt13927994",
     "animal": "tt13751694",
     "avatar": "tt0499549",
     "avatar the way of water": "tt1630029",
     "spider man": "tt10872600",
     "oppenheimer": "tt15398776"
 }
+
+_IMDB_CACHE = {}
+
+def get_live_imdb_id(query_str: str) -> str:
+    clean_q = clean_text(query_str)
+    if clean_q in IMDB_DATABASE:
+        return IMDB_DATABASE[clean_q]
+    if clean_q in _IMDB_CACHE:
+        return _IMDB_CACHE[clean_q]
+    for k, v in IMDB_DATABASE.items():
+        if k in clean_q or clean_q in k:
+            return v
+    # Dynamic Cinemeta lookup
+    try:
+        url = f"https://v3-cinemeta.strem.io/catalog/movie/top/search={urllib.parse.quote(query_str)}.json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            metas = data.get("metas", [])
+            if metas and metas[0].get("id"):
+                found_id = metas[0].get("id")
+                _IMDB_CACHE[clean_q] = found_id
+                return found_id
+    except Exception:
+        pass
+    return None
 
 @app.post("/api/search")
 def search_movie(req: SearchRequest):
@@ -763,24 +790,23 @@ def search_movie(req: SearchRequest):
         x.get("confidence", 0)
     ), reverse=True)
     
-    clean_q = clean_text(query)
-    imdb_id = IMDB_DATABASE.get(clean_q) or (meta.get("imdb_id") if isinstance(meta, dict) else None)
+    imdb_id = get_live_imdb_id(query) or (meta.get("imdb_id") if isinstance(meta, dict) else None)
 
     # Universal Multi-Server Cinema Card (ensures any requested movie can be streamed!)
-    s1 = f"https://vidsrc.to/embed/movie/{imdb_id}" if imdb_id else f"https://vidsrc.to/embed/movie/{urllib.parse.quote(query)}"
-    s2 = f"https://vidsrc.me/embed/movie?imdb={imdb_id}" if imdb_id else f"https://vidsrc.me/embed/movie?imdb={urllib.parse.quote(query)}"
-    s3 = f"https://2embed.cc/embed/{imdb_id}" if imdb_id else f"https://2embed.cc/embed/{urllib.parse.quote(query)}"
-    s4 = f"https://autoembed.co/movie/imdb/{imdb_id}" if imdb_id else f"https://autoembed.co/movie/imdb/{urllib.parse.quote(query)}"
+    s1 = f"https://vidlink.pro/movie/{imdb_id}" if imdb_id else f"https://vidlink.pro/movie/{urllib.parse.quote(query)}"
+    s2 = f"https://embed.smashystream.com/playere.php?imdb={imdb_id}" if imdb_id else f"https://embed.smashystream.com/playere.php?imdb={urllib.parse.quote(query)}"
+    s3 = f"https://vidsrc.me/embed/movie?imdb={imdb_id}" if imdb_id else f"https://vidsrc.me/embed/movie?imdb={urllib.parse.quote(query)}"
+    s4 = f"https://2embed.cc/embed/{imdb_id}" if imdb_id else f"https://2embed.cc/embed/{urllib.parse.quote(query)}"
 
     universal_card = {
         "title": f"{query.title()} • Full Movie (Universal Cinema Server)",
         "source": "Multi-Server Cloud (Any Movie)",
         "stream_url": s1,
         "servers": {
-            "Server 1 (Ultra HD)": s1,
-            "Server 2 (VIP Cloud)": s2,
-            "Server 3 (Fast Mirror)": s3,
-            "Server 4 (Alternative)": s4
+            "Server 1 (VidLink HD)": s1,
+            "Server 2 (Smashy Cloud)": s2,
+            "Server 3 (VIP Cloud)": s3,
+            "Server 4 (Fast Mirror)": s4
         },
         "imdb_id": imdb_id,
         "type": "universal_embed",
@@ -909,7 +935,7 @@ def extract_stream(url: str, quality: str = "best"):
         return {"stream_type": "video", "stream_url": url, "title": "Direct Stream"}
 
     # If universal embed or multi-server URL
-    if any(k in url.lower() for k in ["multiembed", "vidsrc", "2embed", "autoembed", "superembed", "/embed"]):
+    if any(k in url.lower() for k in ["multiembed", "vidsrc", "2embed", "autoembed", "superembed", "vidlink", "smashystream", "/embed", "/movie"]):
         return {"stream_type": "embed", "stream_url": url, "title": "Universal Cinema Stream", "quality": quality}
 
     yt_match = re.search(r'(?:v=|\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})', url)
