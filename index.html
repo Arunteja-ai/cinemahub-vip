@@ -1244,6 +1244,18 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
               <span class="px-2 py-0.5 rounded text-gray-300 bg-gray-800">⏱ ${item.duration_formatted || 'Stream'}</span>
               <span class="text-gray-500">${item.source}</span>
             </div>
+            <div class="flex items-center gap-2 mt-2 flex-wrap">
+              ${item.movierulz_search_url ? `
+                <a href="${item.movierulz_search_url}" target="_blank" class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition flex items-center gap-1">
+                  <span>⚡</span> MovieRulz Mirror
+                </a>
+              ` : ''}
+              ${item.filmyzilla_search_url ? `
+                <a href="${item.filmyzilla_search_url}" target="_blank" class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 transition flex items-center gap-1">
+                  <span>🎬</span> FilmyZilla Mirror
+                </a>
+              ` : ''}
+            </div>
             ${item.audio_warning ? `
             <div class="text-xs text-amber-300 bg-amber-950/75 border border-amber-800/80 rounded-lg px-3 py-1.5 mt-2 font-medium flex items-center gap-1.5">
               <span>⚠️</span>
